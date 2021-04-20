@@ -11,7 +11,7 @@ import List from "@material-ui/core/List";
 import ListItem from "@material-ui/core/ListItem";
 import ListItemText from "@material-ui/core/ListItemText";
 import Grid from "@material-ui/core/Grid";
-import { isEmpty, forOwn } from "lodash";
+import { isEmpty, forOwn, cloneDeep } from "lodash";
 import axios from "axios";
 import updateHistoricalCurrency from "../../actions/currency/updateHistoricalCurrency";
 
@@ -28,8 +28,39 @@ class CurrencyData extends PureComponent {
       anchorEl: null,
       currencyValue: "United States Dollar",
       id: "USD",
+      cRate: 0,
     };
   }
+
+  componentDidMount() {
+    const { historicalCurrency, currency } = this.props;
+    if (!isEmpty(currency)) {
+      this.updateCurrency();
+    }
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    const { historicalCurrency, currency } = this.props;
+    if (historicalCurrency != prevProps.historicalCurrency && !isEmpty(historicalCurrency)) {
+      this.updateCurrency();
+    }
+    if (currency != prevProps.currency && !isEmpty(currency)) {
+      this.updateCurrency();
+    }
+  }
+
+  updateCurrency = () => {
+    const { historicalCurrency, currency } = this.props;
+    const { id } = this.state;
+
+    if (!isEmpty(currency)) {
+      forOwn(currency, (value, key) => {
+        if (key === id) {
+          this.setState({ cRate: value.rate });
+        }
+      });
+    }
+  };
 
   handleClick = (event, elementId) => {
     this.setState({
@@ -44,30 +75,31 @@ class CurrencyData extends PureComponent {
   };
 
   handleCurrencySelect = (value) => {
-    const { id } = this.state;
     let self = this;
+    self.setState({
+      currencyValue: value.label,
+      id: value.value,
+    });
     this.handlePopoverClose();
     let URL = "";
-    if (id === "USD") {
+    if (value.value === "USD") {
       URL =
         "https://api.coindesk.com/v1/bpi/historical/close.json?currency=USD&start=2013-09-01&end=2013-09-10";
-    } else if (id === "GBP") {
+    } else if (value.value === "GBP") {
       URL =
         "https://api.coindesk.com/v1/bpi/historical/close.json?currency=GBP&start=2013-09-01&end=2013-09-10";
-    } else if (id === "EUR") {
+    } else if (value.value === "EUR") {
       URL =
         "https://api.coindesk.com/v1/bpi/historical/close.json?currency=EUR&start=2013-09-01&end=2013-09-10";
     }
     axios({
       method: "GET",
-      url: URL
+      url: URL,
     })
       .then(function (response) {
-        self.props.updateHistoricalCurrency(response.request.response);
-        self.setState({
-          currencyValue: value.label,
-          id: value.id,
-        });
+        self.props.updateHistoricalCurrency(
+          cloneDeep(response.request.response)
+        );
       })
       .catch(function (error) {
         setTimeout(function () {
@@ -126,20 +158,12 @@ class CurrencyData extends PureComponent {
 
   render() {
     const { classes, currency } = this.props;
-    const { anchorEl, currencyValue, id } = this.state;
-    let cRate = 0;
-    if (!isEmpty(currency)) {
-      forOwn(currency, (value, key) => {
-        if (key === id) {
-          cRate = value.rate;
-        }
-      });
-    }
+    const { anchorEl, currencyValue, id, cRate } = this.state;
     return (
       <Grid className={classes.currencyDataDiv}>
         <div className={classes.mainDiv}>{this.fetchCurrency()}</div>
         <Typography variant="h4" className={classes.text}>
-          {cRate + currencyValue}
+          {cRate + " " + currencyValue}
         </Typography>
       </Grid>
     );
